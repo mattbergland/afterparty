@@ -93,18 +93,32 @@ jobs:
           set -euo pipefail
           rm -rf docs/screenshots_raw
           mkdir -p docs/screenshots_raw docs/screenshots
-          xcparse screenshots TestResults.xcresult docs/screenshots_raw
+          # `--test` pulls the XCUITest attachments; do NOT pass `--device`
+          # (not a valid flag in xcparse 2.3.x). The command must not be wrapped
+          # in `|| true` so a real extraction failure surfaces.
+          xcparse screenshots --test TestResults.xcresult docs/screenshots_raw
           echo "Extracted files:"
-          find docs/screenshots_raw -type f
-          INPUT=$(find docs/screenshots_raw -iname '*input*' | head -1 || true)
-          RESULTS=$(find docs/screenshots_raw -iname '*result*' | head -1 || true)
+          find docs/screenshots_raw -type f -name '*.png' | sort
+          # Primary: match by the attachment name baked into the filename
+          # (01-input-screen / 02-results-screen). xcparse appends a UUID.
+          INPUT=$(find docs/screenshots_raw -type f -iname '*input*' | sort | head -1 || true)
+          RESULTS=$(find docs/screenshots_raw -type f -iname '*result*' | sort | head -1 || true)
+          # Fallback: capture order — "01-" sorts before "02-".
           if [ -z "$INPUT" ] || [ -z "$RESULTS" ]; then
-            echo "::error::Expected screenshots were not found in the xcresult bundle"
+            echo "Name match incomplete; falling back to sorted capture order."
+            ALL=$(find docs/screenshots_raw -type f -name '*.png' | sort)
+            [ -z "$INPUT" ] && INPUT=$(printf '%s\n' "$ALL" | sed -n '1p')
+            [ -z "$RESULTS" ] && RESULTS=$(printf '%s\n' "$ALL" | sed -n '2p')
+          fi
+          if [ -z "$INPUT" ] || [ -z "$RESULTS" ]; then
+            echo "::error::Expected input + results screenshots were not found in the xcresult bundle"
+            find docs/screenshots_raw -type f || true
             exit 1
           fi
           cp "$INPUT" docs/screenshots/input.png
           cp "$RESULTS" docs/screenshots/results.png
-          echo "Saved docs/screenshots/input.png and docs/screenshots/results.png"
+          echo "Saved docs/screenshots/input.png (from $INPUT)"
+          echo "Saved docs/screenshots/results.png (from $RESULTS)"
 
       - name: Commit screenshots back to the PR branch
         if: success() && github.event_name == 'pull_request'

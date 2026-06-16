@@ -35,7 +35,7 @@ final class AfterpartyUITests: XCTestCase {
         let createButton = app.buttons["createFollowUpButton"]
         XCTAssertTrue(createButton.waitForExistence(timeout: 10), "Create button should appear")
 
-        attach(name: "afterparty-input", screenshot: XCUIScreen.main.screenshot())
+        attach(name: "01-input-screen", screenshot: XCUIScreen.main.screenshot())
 
         // MARK: Generate
         createButton.tap()
@@ -54,7 +54,7 @@ final class AfterpartyUITests: XCTestCase {
 
         // Give SwiftUI a beat to settle the transition before capturing.
         sleep(1)
-        attach(name: "afterparty-results", screenshot: XCUIScreen.main.screenshot())
+        attach(name: "02-results-screen", screenshot: XCUIScreen.main.screenshot())
     }
 
     private func attach(name: String, screenshot: XCUIScreenshot) {
