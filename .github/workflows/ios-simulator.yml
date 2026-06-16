@@ -30,7 +30,9 @@ jobs:
           xcode-version: '15.4'
 
       - name: Install XcodeGen + xcparse
-        run: brew install xcodegen xcparse
+        run: |
+          brew install xcodegen
+          brew install chargepoint/xcparse/xcparse
 
       - name: Generate Xcode project
         run: xcodegen generate --spec project.yml
