@@ -1,0 +1,149 @@
+name: iOS Simulator
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ios-simulator-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  ui-test:
+    name: Build & UI Test (iOS Simulator)
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Check out the PR's source branch so we can push screenshots back to it.
+          ref: ${{ github.head_ref || github.ref_name }}
+          persist-credentials: true
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Install XcodeGen + xcparse
+        run: |
+          brew install xcodegen
+          brew install chargepoint/xcparse/xcparse
+
+      - name: Generate Xcode project
+        run: xcodegen generate --spec project.yml
+
+      - name: List available simulators
+        run: xcrun simctl list devices available
+
+      - name: Pick and boot a simulator
+        id: sim
+        run: |
+          set -euo pipefail
+          AVAILABLE=$(xcrun simctl list devices available)
+          DEVICE_LINE=$(echo "$AVAILABLE" | grep -E "iPhone 1[5-9] \(" | head -1 || true)
+          if [ -z "$DEVICE_LINE" ]; then
+            DEVICE_LINE=$(echo "$AVAILABLE" | grep -E "iPhone .* \(" | head -1)
+          fi
+          UDID=$(echo "$DEVICE_LINE" | grep -Eo '[0-9A-Fa-f]{8}-([0-9A-Fa-f]{4}-){3}[0-9A-Fa-f]{12}' | head -1)
+          NAME=$(echo "$DEVICE_LINE" | sed -E 's/ *\(.*//; s/^ *//')
+          echo "Using simulator: $NAME ($UDID)"
+          echo "udid=$UDID" >> "$GITHUB_OUTPUT"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$UDID" || true
+          xcrun simctl bootstatus "$UDID" -b
+
+      - name: Start screen recording (best effort)
+        id: video
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts
+          nohup xcrun simctl io "${{ steps.sim.outputs.udid }}" recordVideo --codec=h264 artifacts/afterparty-demo.mp4 > /tmp/rec.log 2>&1 &
+          echo "pid=$!" >> "$GITHUB_OUTPUT"
+          echo "Recording started (pid $!)"
+
+      - name: Build & run UI tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Afterparty.xcodeproj \
+            -scheme Afterparty \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            -resultBundlePath TestResults.xcresult \
+            -only-testing:AfterpartyUITests \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Stop screen recording (best effort)
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -n "${{ steps.video.outputs.pid }}" ]; then
+            kill -INT "${{ steps.video.outputs.pid }}" || true
+            sleep 3
+          fi
+          ls -la artifacts || true
+
+      - name: Extract screenshots from xcresult
+        if: always()
+        run: |
+          set -euo pipefail
+          rm -rf docs/screenshots_raw
+          mkdir -p docs/screenshots_raw docs/screenshots
+          # `--test` pulls the XCUITest attachments; do NOT pass `--device`
+          # (not a valid flag in xcparse 2.3.x). The command must not be wrapped
+          # in `|| true` so a real extraction failure surfaces.
+          xcparse screenshots --test TestResults.xcresult docs/screenshots_raw
+          echo "Extracted files:"
+          find docs/screenshots_raw -type f -name '*.png' | sort
+          # Primary: match by the attachment name baked into the filename
+          # (01-input-screen / 02-results-screen). xcparse appends a UUID.
+          INPUT=$(find docs/screenshots_raw -type f -iname '*input*' | sort | head -1 || true)
+          RESULTS=$(find docs/screenshots_raw -type f -iname '*result*' | sort | head -1 || true)
+          # Fallback: capture order — "01-" sorts before "02-".
+          if [ -z "$INPUT" ] || [ -z "$RESULTS" ]; then
+            echo "Name match incomplete; falling back to sorted capture order."
+            ALL=$(find docs/screenshots_raw -type f -name '*.png' | sort)
+            [ -z "$INPUT" ] && INPUT=$(printf '%s\n' "$ALL" | sed -n '1p')
+            [ -z "$RESULTS" ] && RESULTS=$(printf '%s\n' "$ALL" | sed -n '2p')
+          fi
+          if [ -z "$INPUT" ] || [ -z "$RESULTS" ]; then
+            echo "::error::Expected input + results screenshots were not found in the xcresult bundle"
+            find docs/screenshots_raw -type f || true
+            exit 1
+          fi
+          cp "$INPUT" docs/screenshots/input.png
+          cp "$RESULTS" docs/screenshots/results.png
+          echo "Saved docs/screenshots/input.png (from $INPUT)"
+          echo "Saved docs/screenshots/results.png (from $RESULTS)"
+
+      - name: Commit screenshots back to the PR branch
+        if: success() && github.event_name == 'pull_request'
+        env:
+          # Bound to an env var to avoid shell injection via the branch name.
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/screenshots/input.png docs/screenshots/results.png
+          if git diff --staged --quiet; then
+            echo "No screenshot changes to commit."
+          else
+            git commit -m "ci: update iOS Simulator screenshots [skip ci]"
+            git push origin "HEAD:$HEAD_REF"
+          fi
+
+      - name: Upload screenshots + video + result bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-screenshots
+          path: |
+            docs/screenshots/*.png
+            artifacts/*.mp4
+            TestResults.xcresult
+          if-no-files-found: warn
