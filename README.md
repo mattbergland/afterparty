@@ -166,9 +166,6 @@ screen, and captures these screenshots. They are uploaded as workflow artifacts
 | --- | --- |
 | ![Afterparty input screen](docs/screenshots/input.png) | ![Afterparty results screen](docs/screenshots/results.png) |
 
-> If the images above are not yet visible, the macOS UI-test job is still
-> running on the PR — it commits the real screenshots when it finishes.
-
 ---
 
 ## How it's tested in CI
