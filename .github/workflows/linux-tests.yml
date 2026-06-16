@@ -1,0 +1,28 @@
+name: Linux Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: linux-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  swift-test:
+    name: swift build && swift test (Linux)
+    runs-on: ubuntu-latest
+    container: swift:6.1-jammy
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build core engine
+        run: swift build
+
+      - name: Run tests (offline, no API key)
+        run: swift test

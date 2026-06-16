@@ -1,0 +1,80 @@
+name: Afterparty
+
+options:
+  bundleIdPrefix: land.mattberg
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+  groupSortPosition: top
+
+packages:
+  AfterpartyKit:
+    # The core engine lives in this same repository as a local Swift package.
+    path: .
+
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGNING_ALLOWED: NO
+    CODE_SIGN_IDENTITY: ""
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+
+targets:
+  Afterparty:
+    type: application
+    platform: iOS
+    sources:
+      - path: App/Afterparty
+    dependencies:
+      - package: AfterpartyKit
+        product: AfterpartyKit
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: land.mattberg.afterparty
+        GENERATE_INFOPLIST_FILE: NO
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ENABLE_PREVIEWS: YES
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+    info:
+      path: App/Afterparty/Support/Info.plist
+      properties:
+        CFBundleDisplayName: Afterparty
+        CFBundleShortVersionString: "1.0.0"
+        CFBundleVersion: "1"
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIRequiresFullScreen: false
+        # Read by AppConfig at runtime. Defaults to the unexpanded build setting
+        # (treated as "absent") so the app falls back to the offline MockProvider
+        # unless a real key is injected via xcconfig/CI.
+        ANTHROPIC_API_KEY: $(ANTHROPIC_API_KEY)
+
+  AfterpartyUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: AfterpartyUITests
+    dependencies:
+      - target: Afterparty
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: land.mattberg.afterparty.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Afterparty
+
+schemes:
+  Afterparty:
+    build:
+      targets:
+        Afterparty: all
+        AfterpartyUITests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - AfterpartyUITests
+      gatherCoverageData: false
