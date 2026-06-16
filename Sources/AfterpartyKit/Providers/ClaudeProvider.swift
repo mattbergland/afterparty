@@ -32,7 +32,7 @@ public struct ClaudeProvider: AIProvider {
     public init(
         apiKey: String? = nil,
         model: String = ClaudeProvider.defaultModel,
-        maxTokens: Int = 1024,
+        maxTokens: Int = 2048,
         session: URLSession = .shared
     ) throws {
         guard let key = apiKey ?? ProcessInfo.processInfo.environment["ANTHROPIC_API_KEY"],

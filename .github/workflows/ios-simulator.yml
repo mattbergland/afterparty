@@ -108,6 +108,9 @@ jobs:
 
       - name: Commit screenshots back to the PR branch
         if: success() && github.event_name == 'pull_request'
+        env:
+          # Bound to an env var to avoid shell injection via the branch name.
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -117,7 +120,7 @@ jobs:
             echo "No screenshot changes to commit."
           else
             git commit -m "ci: update iOS Simulator screenshots [skip ci]"
-            git push origin HEAD:${{ github.head_ref }}
+            git push origin "HEAD:$HEAD_REF"
           fi
 
       - name: Upload screenshots + video + result bundle

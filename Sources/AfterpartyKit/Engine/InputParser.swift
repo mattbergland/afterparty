@@ -93,9 +93,8 @@ public enum InputParser {
     /// Role = the words between a role verb ("runs", "leads", ...) and the next
     /// "at" / sentence boundary, e.g. "runs developer marketing at Datadog".
     private static func extractRole(from raw: String) -> String? {
-        let lower = raw.lowercased()
         for verb in roleVerbs {
-            guard let verbRange = lower.range(of: " \(verb) ") else { continue }
+            guard let verbRange = raw.range(of: " \(verb) ", options: .caseInsensitive) else { continue }
             let afterVerb = raw[verbRange.upperBound...]
             // Stop at " at ", a period, or the end of the string.
             var end = afterVerb.endIndex
@@ -116,9 +115,8 @@ public enum InputParser {
     /// Topics = the clause following a topic cue ("talked about", "discussed", ...),
     /// split on commas and the word "and".
     private static func extractTopics(from raw: String) -> [String] {
-        let lower = raw.lowercased()
         for cue in topicCues {
-            guard let cueRange = lower.range(of: cue) else { continue }
+            guard let cueRange = raw.range(of: cue, options: .caseInsensitive) else { continue }
             let after = raw[cueRange.upperBound...]
             var end = after.endIndex
             if let dotRange = after.range(of: ".") {

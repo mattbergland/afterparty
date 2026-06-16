@@ -98,8 +98,7 @@ public struct MockProvider: AIProvider {
     /// parser found a name (the clause sits between the name and the next period).
     private static func meetingContext(from note: PersonNote) -> String? {
         let raw = note.trimmed
-        let lower = raw.lowercased()
-        guard let atRange = lower.range(of: " at ") else { return nil }
+        guard let atRange = raw.range(of: " at ", options: .caseInsensitive) else { return nil }
         let after = raw[atRange.upperBound...]
         var end = after.endIndex
         if let dot = after.range(of: ".") { end = dot.lowerBound }
